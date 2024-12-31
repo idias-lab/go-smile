@@ -2,20 +2,25 @@ package decode
 
 import (
 	"fmt"
+
+	"github.com/zencoder/go-smile/domain"
 )
 
 type Decoder struct {
 	sharedState SharedState
 }
 
-func (d *Decoder) DecodeBytes(smileBytes []byte) ([]byte, interface{}, error) {
+func (d *Decoder) DecodeBytes(smileBytes []byte, header domain.Header) ([]byte, interface{}, error) {
 	var token = smileBytes[0]
 	var tokenClass = token >> 5
 	switch tokenClass {
 	case 0:
 		// Short Shared Value String reference
-		value, err := d.sharedState.GetSharedValue(int(token&0x1f) - 1)
-		return smileBytes[1:], value, err
+		if header.SharedStringValueEncodingEnabled {
+			value, err := d.sharedState.GetSharedValue(int(token&0x1f) - 1)
+			return smileBytes[1:], value, err
+		}
+		return smileBytes[1:], nil, nil
 	case 1:
 		// Simple literals, numbers
 		return readSimpleLiteral(smileBytes)
@@ -52,13 +57,13 @@ func (d *Decoder) DecodeBytes(smileBytes []byte) ([]byte, interface{}, error) {
 		return smileBytes[1:], zigzagDecode(int(token & 0x1f)), nil
 	case 7:
 		// Binary / Long text / structure markers (0xF0 - 0xF7 is unused, reserved for future use -- but note, used in key mode)
-		return d.parseBinaryLongTextStructureValues(smileBytes)
+		return d.parseBinaryLongTextStructureValues(smileBytes, header)
 	}
 
 	return []byte{}, "", fmt.Errorf("unrecognised token: %X (Token Class %d)", token, tokenClass)
 }
 
-func (d *Decoder) parseBinaryLongTextStructureValues(smileBytes []byte) ([]byte, interface{}, error) {
+func (d *Decoder) parseBinaryLongTextStructureValues(smileBytes []byte, header domain.Header) ([]byte, interface{}, error) {
 	nextByte := smileBytes[0]
 	switch nextByte {
 	case START_OBJECT:
@@ -77,7 +82,7 @@ func (d *Decoder) parseBinaryLongTextStructureValues(smileBytes []byte) ([]byte,
 				return smileBytes, object, err
 			}
 
-			smileBytes, value, err = d.DecodeBytes(smileBytes)
+			smileBytes, value, err = d.DecodeBytes(smileBytes, header)
 			if err != nil {
 				return smileBytes, object, err
 			}
@@ -93,7 +98,7 @@ func (d *Decoder) parseBinaryLongTextStructureValues(smileBytes []byte) ([]byte,
 		for smileBytes[0] != END_ARRAY {
 			var obj interface{}
 			var err error
-			smileBytes, obj, err = d.DecodeBytes(smileBytes)
+			smileBytes, obj, err = d.DecodeBytes(smileBytes, header)
 			if err != nil {
 				return smileBytes, obj, err
 			}
@@ -107,7 +112,23 @@ func (d *Decoder) parseBinaryLongTextStructureValues(smileBytes []byte) ([]byte,
 		return smileBytes[2:], value, err
 	case LONG_UTF8:
 		return readVariableLengthText(smileBytes)
+	// TODO: check if the header allows binary
+	case START_BINARY:
+		if header.RawBinaryPresent {
+			return d.parseBinary(smileBytes[1:])
+		}
+		return smileBytes[1:], nil, nil
 	}
 
 	return nil, nil, fmt.Errorf("unknown byte '%X' in parseBinaryLongTextStructureValues\n", nextByte)
+}
+
+func (d *Decoder) parseBinary(original []byte) ([]byte, interface{}, error) {
+	smileBytes, length, err := readVarInt(original, false)
+	if err != nil {
+		return smileBytes, nil, err
+	}
+	data := original[:length]
+	smileBytes = original[length:]
+	return smileBytes, data, nil
 }

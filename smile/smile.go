@@ -28,6 +28,6 @@ func DecodeToObject(smile []byte) (interface{}, error) {
 	}
 
 	var d decode.Decoder
-	_, b, err := d.DecodeBytes(smile[header.SizeBytes:])
+	_, b, err := d.DecodeBytes(smile[header.SizeBytes:], header)
 	return b, err
 }
