@@ -112,7 +112,7 @@ func zigzagDecode(varInt int) int {
 }
 
 func readTinyAscii(smileBytes []byte) ([]byte, interface{}, error) {
-	var length = int(smileBytes[0]&0x1F) + 1
+	var length = int(smileBytes[0]&0x3F) + 1
 	var s = string(smileBytes[1 : length+1])
 
 	return smileBytes[length+1:], s, nil
