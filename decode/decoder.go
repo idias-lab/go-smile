@@ -128,6 +128,6 @@ func (d *Decoder) parseBinary(original []byte) ([]byte, interface{}, error) {
 		return smileBytes, nil, err
 	}
 	data := original[:length]
-	smileBytes = original[length:]
+	smileBytes = original[length+1:]
 	return smileBytes, data, nil
 }
