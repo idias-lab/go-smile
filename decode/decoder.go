@@ -83,11 +83,10 @@ func (d *Decoder) parseBinaryLongTextStructureValues(smileBytes []byte, header d
 			}
 
 			smileBytes, value, err = d.DecodeBytes(smileBytes, header)
+			object[key.(string)] = value
 			if err != nil {
 				return smileBytes, object, err
 			}
-
-			object[key.(string)] = value
 		}
 		return smileBytes[1:], object, nil
 	case LONG_VARIABLE_ASCII:
