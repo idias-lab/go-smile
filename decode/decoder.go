@@ -90,7 +90,7 @@ func (d *Decoder) parseBinaryLongTextStructureValues(smileBytes []byte, header d
 		}
 		return smileBytes[1:], object, nil
 	case LONG_VARIABLE_ASCII:
-		return readVariableLengthText(smileBytes)
+		return readVariableLengthText(smileBytes[1:])
 	case START_ARRAY:
 		smileBytes = smileBytes[1:]
 		var array []interface{}
@@ -110,7 +110,7 @@ func (d *Decoder) parseBinaryLongTextStructureValues(smileBytes []byte, header d
 		value, err := d.sharedState.GetSharedValue(ref)
 		return smileBytes[2:], value, err
 	case LONG_UTF8:
-		return readVariableLengthText(smileBytes)
+		return readVariableLengthText(smileBytes[1:])
 	// TODO: check if the header allows binary
 	case START_BINARY:
 		if header.RawBinaryPresent {

@@ -12,7 +12,7 @@ func readVariableLengthText(smileBytes []byte) ([]byte, interface{}, error) {
 		length++
 	}
 
-	var s = string(smileBytes[1:length])
+	var s = string(smileBytes[:length])
 	return smileBytes[length+1:], s, nil
 }
 
