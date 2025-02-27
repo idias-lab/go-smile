@@ -1,0 +1,3 @@
+[submodule "smile-js"]
+	path = smile-js
+	url = git@github.com:ngyewch/smile-js.git

@@ -1,7 +1,10 @@
 package decode
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/big"
 )
@@ -12,7 +15,7 @@ func readVariableLengthText(smileBytes []byte) ([]byte, interface{}, error) {
 		length++
 	}
 
-	var s = string(smileBytes[1:length])
+	var s = string(smileBytes[:length])
 	return smileBytes[length+1:], s, nil
 }
 
@@ -57,19 +60,87 @@ func readFloat64(smileBytes []byte) ([]byte, interface{}, error) {
 	return smileBytes[10:], math.Float64frombits(intBits), nil
 }
 
-func readVarInt(smileBytes []byte, doZigZagDecode bool) ([]byte, int, error) {
-	var varInt, i int
-	for i = 0; smileBytes[i]&0x80 == 0; i++ {
-		varInt = varInt << 7
-		varInt |= int(smileBytes[i])
+func readVarInt(smileBytes []byte, doZigZagDecode bool) ([]byte, int64, error) {
+	varInt, length, err := ReadVInt(bytes.NewReader(smileBytes))
+	if err != nil {
+		return smileBytes, 0, err
 	}
-	varInt = varInt << 6
-	varInt |= int(smileBytes[i] & 0x3F)
-
 	if doZigZagDecode {
-		varInt = zigzagDecode(varInt)
+		r, err := DecodeZigZag(varInt)
+		return smileBytes[length:], r.Int64(), err
 	}
-	return smileBytes[i+1:], varInt, nil
+	return smileBytes[length:], varInt.Int64(), err
+}
+
+func DecodeVInt(bytes []byte) (*big.Int, error) {
+	if len(bytes) == 0 {
+		return nil, errors.New("invalid VInt: empty bytes")
+	}
+
+	value := new(big.Int)
+	for i := 0; i < len(bytes); i++ {
+		b := bytes[i]
+		if i < len(bytes)-1 {
+			if (b & 0x80) != 0 {
+				return nil, errors.New("invalid VInt: non-last byte has high bit set")
+			}
+			value.Mul(value, big.NewInt(128))
+			value.Add(value, big.NewInt(int64(b&0x7f)))
+		} else {
+			if (b & 0x80) != 0x80 {
+				return nil, errors.New("invalid VInt: last byte missing high bit")
+			}
+			value.Mul(value, big.NewInt(64))
+			value.Add(value, big.NewInt(int64(b&0x3f)))
+		}
+	}
+	return value, nil
+}
+
+// ReadVInt reads and decodes a variable-length integer from a byte stream.
+func ReadVInt(r io.ByteReader) (*big.Int, int, error) {
+	var data []byte
+	length := 0
+	for {
+		b, err := r.ReadByte()
+		if err != nil {
+			return big.NewInt(0), 0, err
+		}
+		data = append(data, b)
+		length += 1
+		if (b & 0x80) != 0 {
+			break
+		}
+	}
+	b, err := DecodeVInt(data)
+	return b, length, err
+}
+
+func DecodeZigZag(value *big.Int) (*big.Int, error) {
+	if value.Sign() < 0 {
+		return nil, errors.New("illegal zigzag value")
+	}
+
+	// Create a copy to avoid modifying the original value
+	v := new(big.Int).Set(value)
+	remainder := new(big.Int)
+	result := new(big.Int)
+
+	// Check if the value is odd
+	remainder.Mod(v, big.NewInt(2))
+	isOdd := remainder.Cmp(big.NewInt(1)) == 0
+
+	if isOdd {
+		// For odd values: -(v + 1) / 2
+		result.Add(v, big.NewInt(1))
+		result.Div(result, big.NewInt(2))
+		result.Neg(result)
+	} else {
+		// For even values: v / 2
+		result.Div(v, big.NewInt(2))
+	}
+
+	return result, nil
 }
 
 // The format of BigInts is unusual - the initial numeric header tells us how many bytes will be in the

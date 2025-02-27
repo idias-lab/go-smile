@@ -5,8 +5,8 @@ A Golang implementation of the [Jackson-Smile](https://github.com/FasterXML/smil
 ## What's supported
 
 * Decoding is fully supported minus:
-  * Big Decimals
-
+  * Big Decimals (test will fail with `smile-js/testdata/basic/basicSimpleLiteralValues.json` in the bigInt section and some in `smile-js/testdata/serde-smile/{big_decimal,big_integer}`)
+  * To be verifies: `smile-js/testdata/serde-smile/binary`
 * Encoding is not yet supported
 
 ## Developing
