@@ -61,20 +61,6 @@ func readFloat64(smileBytes []byte) ([]byte, interface{}, error) {
 }
 
 func readVarInt(smileBytes []byte, doZigZagDecode bool) ([]byte, int64, error) {
-	// if !doZigZagDecode {
-	// 	var varInt, i int
-	// 	for i = 0; smileBytes[i]&0x80 == 0; i++ {
-	// 		varInt = varInt << 7
-	// 		varInt |= int(smileBytes[i])
-	// 	}
-	// 	varInt = varInt << 6
-	// 	varInt |= int(smileBytes[i] & 0x3F)
-
-	// 	if doZigZagDecode {
-	// 		varInt = zigzagDecode(varInt)
-	// 	}
-	// 	return smileBytes[i+1:], int64(varInt), nil
-	// }
 	varInt, length, err := ReadVInt(bytes.NewReader(smileBytes))
 	if err != nil {
 		return smileBytes, 0, err
